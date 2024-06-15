@@ -10,7 +10,7 @@ const storage = multer.diskStorage({
   },
   filename: function (req, file, cb) {
     const uniqueSuffix = Date.now();
-    cb(null, uniqueSuffix + file.originalname);
+    cb(null, uniqueSuffix + "-" + file.originalname);
   },
 });
 const upload = multer({ storage: storage });
@@ -67,18 +67,50 @@ router.get("/:id", async (request, response) => {
   }
 });
 
-// Route for update a book
-router.put("/:id", async (request, response) => {
+router.put("/:id", upload.single("file"), async (request, response) => {
   try {
-    if (!request.body.title || !request.body.url) {
-      return response.status(400).send({
-        message: "Send all required fields: title, url",
-      });
+    const { id } = request.params;
+    const { name } = request.body;
+    const file = request.file; // File information from multer
+
+    // Log request body and file for debugging
+    console.log("Request body:", request.body);
+    console.log("Uploaded file:", file);
+
+    // Check if name is provided
+    if (!name) {
+      return response.status(400).send({ message: "name is required" });
     }
 
-    const { id } = request.params;
+    // Prepare the update object
+    let updateData = { name };
+    let unsetData = {};
 
-    const result = await Schedule.findByIdAndUpdate(id, request.body);
+    if (file) {
+      // If a file is uploaded, update the 'pdf' field with the file path
+      updateData.pdf = file.filename;
+    } else {
+      // If no file is uploaded, remove the 'pdf' field
+      unsetData.pdf = "";
+    }
+
+    // Build the update query
+    const updateQuery = {};
+    if (Object.keys(updateData).length > 0) {
+      updateQuery.$set = updateData;
+    }
+    if (Object.keys(unsetData).length > 0) {
+      updateQuery.$unset = unsetData;
+    }
+
+    // Log update query for debugging
+    console.log("Update query:", updateQuery);
+
+    // Perform the update operation
+    const result = await Schedule.findByIdAndUpdate(id, updateQuery, {
+      new: true,
+      useFindAndModify: false,
+    });
 
     if (!result) {
       return response.status(404).json({ message: "Schedule not found" });
@@ -86,7 +118,7 @@ router.put("/:id", async (request, response) => {
 
     return response
       .status(200)
-      .send({ message: "Schedule updated successfully" });
+      .send({ message: "Schedule updated successfully", data: result });
   } catch (error) {
     console.log(error.message);
     response.status(500).send({ message: error.message });
