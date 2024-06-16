@@ -1,5 +1,5 @@
 import express from "express";
-import { Schedule } from "../models/scheduleModel.js";
+import { Contact } from "../models/contactModel.js";
 import multer from "multer";
 
 const router = express.Router();
@@ -15,23 +15,25 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage: storage });
 
-// Route for Save a new Schedule
+// Route for Save a new Contact
 router.post("/", upload.single("file"), async (request, response) => {
   try {
-    if (!request.body.name) {
+    if (!request.body.name || !request.body.phone || !request.body.telegram) {
       return response.status(400).send({
-        message: "name is required",
+        message: "name, phone, telegram input are required",
       });
     }
 
-    const newSchedule = {
+    const newContact = {
       name: request.body.name,
-      pdf: request?.file?.filename,
+      phone: request.body.phone,
+      telegram: request.body.telegram,
+      img: request?.file?.filename,
     };
 
-    const schedule = await Schedule.create(newSchedule);
+    const contact = await Contact.create(newContact);
 
-    return response.status(201).send(schedule);
+    return response.status(201).send(contact);
   } catch (error) {
     console.log(error.message);
     response.status(500).send({ message: error.message });
@@ -41,11 +43,11 @@ router.post("/", upload.single("file"), async (request, response) => {
 // Route for Get All Schedules from database
 router.get("/", async (request, response) => {
   try {
-    const schedules = await Schedule.find({});
+    const contacts = await Contact.find({});
 
     return response.status(200).json({
-      count: schedules.length,
-      data: schedules,
+      count: contacts.length,
+      data: contacts,
     });
   } catch (error) {
     console.log(error.message);
@@ -58,9 +60,9 @@ router.get("/:id", async (request, response) => {
   try {
     const { id } = request.params;
 
-    const schedule = await Schedule.findById(id);
+    const contact = await Contact.findById(id);
 
-    return response.status(200).json(schedule);
+    return response.status(200).json(contact);
   } catch (error) {
     console.log(error.message);
     response.status(500).send({ message: error.message });
@@ -70,31 +72,37 @@ router.get("/:id", async (request, response) => {
 router.put("/:id", upload.single("file"), async (request, response) => {
   try {
     const { id } = request.params;
-    const { name, file: filePathFromBody } = request.body;
+    const { name, phone, telegram, file: filePathFromBody } = request.body;
     const fileFromMulter = request.file; // File information from multer
 
     // Check if name is provided
     if (!name) {
       return response.status(400).send({ message: "name is required" });
     }
+    if (!phone) {
+      return response.status(400).send({ message: "phone is required" });
+    }
+    if (!telegram) {
+      return response.status(400).send({ message: "telegram is required" });
+    }
 
     // Prepare the update object
-    let updateData = { name };
+    let updateData = { name, phone, telegram };
     let unsetData = {};
 
     if (fileFromMulter) {
-      // If a file is uploaded via multer, update the 'pdf' field with the uploaded file path
-      updateData.pdf = fileFromMulter.filename;
+      // If a file is uploaded via multer, update the 'img' field with the uploaded file path
+      updateData.img = fileFromMulter.filename;
     } else if (
       filePathFromBody === null ||
       filePathFromBody === "null" ||
       filePathFromBody === undefined ||
       filePathFromBody === "undefined"
     ) {
-      // If the file field in the body is 'null' or the string "null", remove the 'pdf' field
-      unsetData.pdf = 1; // This tells MongoDB to unset (remove) the 'pdf' field
+      // If the file field in the body is 'null' or the string "null", remove the 'img' field
+      unsetData.img = 1; // This tells MongoDB to unset (remove) the 'img' field
     } else if (filePathFromBody) {
-      updateData.pdf = filePathFromBody;
+      updateData.img = filePathFromBody;
     }
 
     // Build the update query
@@ -110,18 +118,18 @@ router.put("/:id", upload.single("file"), async (request, response) => {
     console.log("Update query:", updateQuery);
 
     // Perform the update operation
-    const result = await Schedule.findByIdAndUpdate(id, updateQuery, {
+    const result = await Contact.findByIdAndUpdate(id, updateQuery, {
       new: true,
       useFindAndModify: false,
     });
 
     if (!result) {
-      return response.status(404).json({ message: "Schedule not found" });
+      return response.status(404).json({ message: "Contact not found" });
     }
 
     return response
       .status(200)
-      .send({ message: "Schedule updated successfully", data: result });
+      .send({ message: "Contact updated successfully", data: result });
   } catch (error) {
     console.log(error.message);
     response.status(500).send({ message: error.message });
@@ -133,15 +141,15 @@ router.delete("/:id", async (request, response) => {
   try {
     const { id } = request.params;
 
-    const result = await Schedule.findByIdAndDelete(id);
+    const result = await Contact.findByIdAndDelete(id);
 
     if (!result) {
-      return response.status(404).json({ message: "Schedule not found" });
+      return response.status(404).json({ message: "Contact not found" });
     }
 
     return response
       .status(200)
-      .send({ message: "Schedule deleted successfully" });
+      .send({ message: "Contact deleted successfully" });
   } catch (error) {
     console.log(error.message);
     response.status(500).send({ message: error.message });
