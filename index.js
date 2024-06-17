@@ -4,6 +4,7 @@ import mongoose from "mongoose";
 // import { Schedule } from "./models/scheduleModel.js";
 import schedulesRoute from "./routes/schedulesRoute.js";
 import contactRoute from "./routes/contactRoute.js";
+import faculties from "./routes/facultiesRoute.js";
 import cors from "cors";
 
 const app = express();
@@ -23,6 +24,7 @@ app.get("/", (request, response) => {
 
 app.use("/schedules", schedulesRoute);
 app.use("/contacts", contactRoute);
+app.use("/faculties", faculties);
 
 mongoose
   .connect(mongoDBURL)
