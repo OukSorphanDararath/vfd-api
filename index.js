@@ -27,7 +27,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Middleware for handling CORS POLICY
-app.use(cors({ origin: "https://puc-virtual-frontdesk.vercel.app" })); // Allow specific origin
+app.use(cors()); // Allow specific origin
 
 // Serve static files from the React app's build directory
 app.use(express.static(path.join(__dirname, "client/build")));
