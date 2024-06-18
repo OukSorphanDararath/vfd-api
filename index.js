@@ -1,12 +1,14 @@
 import express from "express";
 import http from "http";
 import { Server as socketIoServer } from "socket.io";
-import { PORT, mongoDBURL } from "./config.js";
 import mongoose from "mongoose";
+import path from "path";
+import { fileURLToPath } from "url"; // Import to convert `import.meta.url`
+import cors from "cors";
+import { PORT, mongoDBURL } from "./config.js";
 import schedulesRoute from "./routes/schedulesRoute.js";
 import contactRoute from "./routes/contactRoute.js";
 import facultiesRoute from "./routes/facultiesRoute.js";
-import cors from "cors";
 
 const app = express();
 const server = http.createServer(app);
@@ -16,23 +18,34 @@ const io = new socketIoServer(server, {
   },
 });
 
+// Convert `import.meta.url` to `__dirname` equivalent
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 // Middleware for parsing request body
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // Middleware for handling CORS POLICY
-app.use(cors()); // Allow all origins with default configuration
-app.use("/files", express.static("files"));
+app.use(cors({ origin: "https://puc-virtual-frontdesk.vercel.app" })); // Allow specific origin
 
-// Define routes
-// app.get("/", (req, res) => {
-//   return res.status(200).send("Welcome to MERN Stack");
-// });
+// Serve static files from the React app's build directory
+app.use(express.static(path.join(__dirname, "client/build")));
 
-app.get("/", (req, res) => {
-  res.send("WebRTC Signaling Server is running");
+// Serve static files from the 'files' directory
+app.use("/files", express.static(path.join(__dirname, "files")));
+
+// Define API routes
+app.use("/schedules", schedulesRoute);
+app.use("/contacts", contactRoute);
+app.use("/faculties", facultiesRoute);
+
+// Fallback to serve the React app's index.html for all other routes
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "client/build", "index.html"));
 });
 
-// Socket.io code for WebRTC signaling
+// WebRTC signaling with Socket.io
 io.on("connection", (socket) => {
   console.log("User connected:", socket.id);
 
@@ -58,10 +71,6 @@ io.on("connection", (socket) => {
     console.log("User disconnected:", socket.id);
   });
 });
-
-app.use("/schedules", schedulesRoute);
-app.use("/contacts", contactRoute);
-app.use("/faculties", facultiesRoute);
 
 // Connect to MongoDB
 mongoose
