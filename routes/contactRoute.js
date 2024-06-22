@@ -1,158 +1,144 @@
 import express from "express";
 import { Contact } from "../models/contactModel.js";
-import multer from "multer";
 
 const router = express.Router();
 
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, "./files");
-  },
-  filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now();
-    cb(null, uniqueSuffix + "-" + file.originalname);
-  },
-});
-const upload = multer({ storage: storage });
+// Middleware to parse JSON and form-data requests
+router.use(express.json());
+router.use(express.urlencoded({ extended: true }));
 
-// Route for Save a new Contact
-router.post("/", upload.single("file"), async (request, response) => {
+// Route for saving a new contact
+router.post("/", async (req, res) => {
   try {
-    if (!request.body.name || !request.body.phone || !request.body.telegram) {
-      return response.status(400).send({
-        message: "name, phone, telegram input are required",
+    // Log the incoming request body
+    console.log("Received POST request body:", req.body);
+
+    // Destructure required fields from request body
+    const { name, phone, telegram, img } = req.body;
+
+    // Validate the required fields
+    if (!name || !phone || !telegram) {
+      return res.status(400).send({
+        message: "name, phone, and telegram are required",
       });
     }
 
-    const newContact = {
-      name: request.body.name,
-      phone: request.body.phone,
-      telegram: request.body.telegram,
-      img: request?.file?.filename,
-    };
+    // Create a new contact object
+    const newContact = { name, phone, telegram, img };
 
+    // Save the contact to the database
     const contact = await Contact.create(newContact);
 
-    return response.status(201).send(contact);
+    // Return the saved contact
+    return res.status(201).send(contact);
   } catch (error) {
-    console.log(error.message);
-    response.status(500).send({ message: error.message });
+    console.error("Error saving contact:", error.message);
+    res.status(500).send({ message: error.message });
   }
 });
 
-// Route for Get All Schedules from database
-router.get("/", async (request, response) => {
+// Route for getting all contacts from the database
+router.get("/", async (req, res) => {
   try {
+    // Fetch all contacts from the database
     const contacts = await Contact.find({});
 
-    return response.status(200).json({
-      count: contacts.length,
-      data: contacts,
-    });
+    // Return the contacts with a count
+    return res.status(200).json({ count: contacts.length, data: contacts });
   } catch (error) {
-    console.log(error.message);
-    response.status(500).send({ message: error.message });
+    console.error("Error fetching contacts:", error.message);
+    res.status(500).send({ message: error.message });
   }
 });
 
-// Route for Get one Schedules from database by id
-router.get("/:id", async (request, response) => {
+// Route for getting a single contact by ID
+router.get("/:id", async (req, res) => {
   try {
-    const { id } = request.params;
+    // Extract the ID from the request parameters
+    const { id } = req.params;
 
+    // Find the contact by ID
     const contact = await Contact.findById(id);
 
-    return response.status(200).json(contact);
+    // Check if the contact exists
+    if (!contact) {
+      return res.status(404).json({ message: "Contact not found" });
+    }
+
+    // Return the found contact
+    return res.status(200).json(contact);
   } catch (error) {
-    console.log(error.message);
-    response.status(500).send({ message: error.message });
+    console.error("Error fetching contact:", error.message);
+    res.status(500).send({ message: error.message });
   }
 });
 
-router.put("/:id", upload.single("file"), async (request, response) => {
+// Route for updating a contact by ID
+router.put("/:id", async (req, res) => {
   try {
-    const { id } = request.params;
-    const { name, phone, telegram, file: filePathFromBody } = request.body;
-    const fileFromMulter = request.file; // File information from multer
+    // Extract the ID from the request parameters
+    const { id } = req.params;
 
-    // Check if name is provided
-    if (!name) {
-      return response.status(400).send({ message: "name is required" });
-    }
-    if (!phone) {
-      return response.status(400).send({ message: "phone is required" });
-    }
-    if (!telegram) {
-      return response.status(400).send({ message: "telegram is required" });
+    // Log the incoming request body for debugging
+    console.log("Received PUT request body:", req.body);
+
+    // Destructure the fields from the request body
+    const { name, phone, telegram, img } = req.body;
+
+    // Validate the required fields
+    if (!name || !phone || !telegram) {
+      return res
+        .status(400)
+        .send({ message: "name, phone, and telegram are required" });
     }
 
     // Prepare the update object
-    let updateData = { name, phone, telegram };
-    let unsetData = {};
-
-    if (fileFromMulter) {
-      // If a file is uploaded via multer, update the 'img' field with the uploaded file path
-      updateData.img = fileFromMulter.filename;
-    } else if (
-      filePathFromBody === null ||
-      filePathFromBody === "null" ||
-      filePathFromBody === undefined ||
-      filePathFromBody === "undefined"
-    ) {
-      // If the file field in the body is 'null' or the string "null", remove the 'img' field
-      unsetData.img = 1; // This tells MongoDB to unset (remove) the 'img' field
-    } else if (filePathFromBody) {
-      updateData.img = filePathFromBody;
-    }
-
-    // Build the update query
-    const updateQuery = {};
-    if (Object.keys(updateData).length > 0) {
-      updateQuery.$set = updateData;
-    }
-    if (Object.keys(unsetData).length > 0) {
-      updateQuery.$unset = unsetData;
-    }
-
-    // Log update query for debugging
-    console.log("Update query:", updateQuery);
+    const updateData = { name, phone, telegram, img };
 
     // Perform the update operation
-    const result = await Contact.findByIdAndUpdate(id, updateQuery, {
-      new: true,
-      useFindAndModify: false,
-    });
+    const result = await Contact.findByIdAndUpdate(
+      id,
+      { $set: updateData },
+      {
+        new: true, // Return the updated document
+        useFindAndModify: false, // Use the newer findOneAndUpdate() function
+      }
+    );
 
+    // Check if the contact was found and updated
     if (!result) {
-      return response.status(404).json({ message: "Contact not found" });
+      return res.status(404).json({ message: "Contact not found" });
     }
 
-    return response
+    // Return the updated contact
+    return res
       .status(200)
       .send({ message: "Contact updated successfully", data: result });
   } catch (error) {
-    console.log(error.message);
-    response.status(500).send({ message: error.message });
+    console.error("Error updating contact:", error.message);
+    res.status(500).send({ message: error.message });
   }
 });
 
-// Route for Delete a book
-router.delete("/:id", async (request, response) => {
+// Route for deleting a contact by ID
+router.delete("/:id", async (req, res) => {
   try {
-    const { id } = request.params;
+    // Extract the ID from the request parameters
+    const { id } = req.params;
 
+    // Delete the contact by ID
     const result = await Contact.findByIdAndDelete(id);
 
+    // Check if the contact was found and deleted
     if (!result) {
-      return response.status(404).json({ message: "Contact not found" });
+      return res.status(404).json({ message: "Contact not found" });
     }
 
-    return response
-      .status(200)
-      .send({ message: "Contact deleted successfully" });
+    // Return a success message
+    return res.status(200).send({ message: "Contact deleted successfully" });
   } catch (error) {
-    console.log(error.message);
-    response.status(500).send({ message: error.message });
+    console.error("Error deleting contact:", error.message);
+    res.status(500).send({ message: error.message });
   }
 });
 
