@@ -1,150 +1,122 @@
 import express from "express";
 import { Schedule } from "../models/scheduleModel.js";
-import multer from "multer";
 
 const router = express.Router();
 
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, "./files");
-  },
-  filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now();
-    cb(null, uniqueSuffix + "-" + file.originalname);
-  },
-})
-const upload = multer({ storage: storage });
-
-// Route for Save a new Schedule
-router.post("/", upload.single("file"), async (request, response) => {
+// Route to save a new Schedule with optional file path and PDF name
+router.post("/", async (request, response) => {
   try {
-    if (!request.body.name) {
-      return response.status(400).send({
-        message: "name is required",
-      });
+    const { name, pdfPath, pdfName } = request.body;
+
+    if (!name) {
+      return response.status(400).json({ message: "'name' is required" });
     }
 
     const newSchedule = {
-      name: request.body.name,
-      pdf: request?.file?.filename,
+      name,
+      pdfPath: pdfPath || null, // Store the file path if provided, else null
+      pdfName: pdfName || null, // Store the display name if provided, else null
     };
 
     const schedule = await Schedule.create(newSchedule);
 
-    return response.status(201).send(schedule);
+    return response.status(201).json(schedule);
   } catch (error) {
-    console.log(error.message);
-    response.status(500).send({ message: error.message });
+    console.error("Error saving schedule:", error.message);
+    response
+      .status(500)
+      .json({ message: "Failed to save schedule", error: error.message });
   }
 });
 
-// Route for Get All Schedules from database
+// Route to get all schedules
 router.get("/", async (request, response) => {
   try {
     const schedules = await Schedule.find({});
-
-    return response.status(200).json({
-      count: schedules.length,
-      data: schedules,
-    });
+    response.status(200).json({ count: schedules.length, data: schedules });
   } catch (error) {
-    console.log(error.message);
-    response.status(500).send({ message: error.message });
+    console.error("Error fetching schedules:", error.message);
+    response
+      .status(500)
+      .json({ message: "Failed to fetch schedules", error: error.message });
   }
 });
 
-// Route for Get one Schedules from database by id
+// Route to get a schedule by id
 router.get("/:id", async (request, response) => {
   try {
     const { id } = request.params;
-
     const schedule = await Schedule.findById(id);
 
-    return response.status(200).json(schedule);
+    if (!schedule) {
+      return response.status(404).json({ message: "Schedule not found" });
+    }
+
+    response.status(200).json(schedule);
   } catch (error) {
-    console.log(error.message);
-    response.status(500).send({ message: error.message });
+    console.error("Error fetching schedule by ID:", error.message);
+    response
+      .status(500)
+      .json({ message: "Failed to fetch schedule", error: error.message });
   }
 });
 
-router.put("/:id", upload.single("file"), async (request, response) => {
+// Route to update a schedule by id
+router.put("/:id", async (request, response) => {
   try {
     const { id } = request.params;
-    const { name, file: filePathFromBody } = request.body;
-    const fileFromMulter = request.file; // File information from multer
+    const { name, pdfPath, pdfName } = request.body;
 
-    // Check if name is provided
     if (!name) {
-      return response.status(400).send({ message: "name is required" });
+      return response.status(400).json({ message: "'name' is required" });
     }
 
-    // Prepare the update object
-    let updateData = { name };
-    let unsetData = {};
+    const updateData = { name };
 
-    if (fileFromMulter) {
-      // If a file is uploaded via multer, update the 'pdf' field with the uploaded file path
-      updateData.pdf = fileFromMulter.filename;
-    } else if (
-      filePathFromBody === null ||
-      filePathFromBody === "null" ||
-      filePathFromBody === undefined ||
-      filePathFromBody === "undefined"
-    ) {
-      // If the file field in the body is 'null' or the string "null", remove the 'pdf' field
-      unsetData.pdf = 1; // This tells MongoDB to unset (remove) the 'pdf' field
-    } else if (filePathFromBody) {
-      updateData.pdf = filePathFromBody;
+    if (pdfPath !== undefined) {
+      updateData.pdfPath = pdfPath; // Update the file path if provided
+    }
+    if (pdfName !== undefined) {
+      updateData.pdfName = pdfName; // Update the display name if provided
     }
 
-    // Build the update query
-    const updateQuery = {};
-    if (Object.keys(updateData).length > 0) {
-      updateQuery.$set = updateData;
-    }
-    if (Object.keys(unsetData).length > 0) {
-      updateQuery.$unset = unsetData;
-    }
-
-    // Log update query for debugging
-    console.log("Update query:", updateQuery);
-
-    // Perform the update operation
-    const result = await Schedule.findByIdAndUpdate(id, updateQuery, {
+    const updatedSchedule = await Schedule.findByIdAndUpdate(id, updateData, {
       new: true,
       useFindAndModify: false,
     });
 
-    if (!result) {
+    if (!updatedSchedule) {
       return response.status(404).json({ message: "Schedule not found" });
     }
 
-    return response
-      .status(200)
-      .send({ message: "Schedule updated successfully", data: result });
+    response.status(200).json({
+      message: "Schedule updated successfully",
+      data: updatedSchedule,
+    });
   } catch (error) {
-    console.log(error.message);
-    response.status(500).send({ message: error.message });
+    console.error("Error updating schedule:", error.message);
+    response
+      .status(500)
+      .json({ message: "Failed to update schedule", error: error.message });
   }
 });
 
-// Route for Delete a book
+// Route to delete a schedule by id
 router.delete("/:id", async (request, response) => {
   try {
     const { id } = request.params;
+    const deletedSchedule = await Schedule.findByIdAndDelete(id);
 
-    const result = await Schedule.findByIdAndDelete(id);
-
-    if (!result) {
+    if (!deletedSchedule) {
       return response.status(404).json({ message: "Schedule not found" });
     }
 
-    return response
-      .status(200)
-      .send({ message: "Schedule deleted successfully" });
+    response.status(200).json({ message: "Schedule deleted successfully" });
   } catch (error) {
-    console.log(error.message);
-    response.status(500).send({ message: error.message });
+    console.error("Error deleting schedule:", error.message);
+    response
+      .status(500)
+      .json({ message: "Failed to delete schedule", error: error.message });
   }
 });
 
