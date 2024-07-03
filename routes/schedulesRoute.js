@@ -3,10 +3,10 @@ import { Schedule } from "../models/scheduleModel.js";
 
 const router = express.Router();
 
-// Route to save a new Schedule with optional file path and PDF name
+// Route to save a new Schedule with optional file path, PDF name, and schedules array
 router.post("/", async (request, response) => {
   try {
-    const { name, pdfPath, pdfName } = request.body;
+    const { name, pdfPath, pdfName, schedules } = request.body;
 
     if (!name) {
       return response.status(400).json({ message: "'name' is required" });
@@ -16,6 +16,7 @@ router.post("/", async (request, response) => {
       name,
       pdfPath: pdfPath || null, // Store the file path if provided, else null
       pdfName: pdfName || null, // Store the display name if provided, else null
+      schedules: Array.isArray(schedules) ? schedules : [], // Use the provided schedules array or default to an empty array
     };
 
     const schedule = await Schedule.create(newSchedule);
@@ -65,7 +66,7 @@ router.get("/:id", async (request, response) => {
 router.put("/:id", async (request, response) => {
   try {
     const { id } = request.params;
-    const { name, pdfPath, pdfName } = request.body;
+    const { name, pdfPath, pdfName, schedules } = request.body;
 
     if (!name) {
       return response.status(400).json({ message: "'name' is required" });
@@ -78,6 +79,9 @@ router.put("/:id", async (request, response) => {
     }
     if (pdfName !== undefined) {
       updateData.pdfName = pdfName; // Update the display name if provided
+    }
+    if (Array.isArray(schedules)) {
+      updateData.schedules = schedules; // Update the schedules array if provided
     }
 
     const updatedSchedule = await Schedule.findByIdAndUpdate(id, updateData, {
