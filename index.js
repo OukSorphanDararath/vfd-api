@@ -7,6 +7,7 @@ import { PORT, mongoDBURL } from "./config.js";
 import schedulesRoute from "./routes/schedulesRoute.js";
 import contactRoute from "./routes/contactRoute.js";
 import facultiesRoute from "./routes/facultiesRoute.js";
+import announcementsRoute from "./routes/announcementRoute.js";
 
 const app = express();
 const server = http.createServer(app);
@@ -27,33 +28,7 @@ app.use(cors()); // Allow specific origin
 app.use("/schedules", schedulesRoute);
 app.use("/contacts", contactRoute);
 app.use("/faculties", facultiesRoute);
-
-// WebRTC signaling with Socket.io
-// io.on("connection", (socket) => {
-//   console.log("User connected:", socket.id);
-
-//   socket.on("offer", (data) => {
-//     console.log("Received offer from client:", data);
-//     // Broadcast the offer to all other clients (admin side in this case)
-//     socket.broadcast.emit("offer", data);
-//   });
-
-//   socket.on("answer", (data) => {
-//     console.log("Received answer from admin:", data);
-//     // Broadcast the answer back to the client who made the offer
-//     socket.broadcast.emit("answer", data);
-//   });
-
-//   socket.on("icecandidate", (data) => {
-//     console.log("Received ICE candidate:", data);
-//     // Broadcast the ICE candidate to the other peer
-//     socket.broadcast.emit("icecandidate", data);
-//   });
-
-//   socket.on("disconnect", () => {
-//     console.log("User disconnected:", socket.id);
-//   });
-// });
+app.use("/announcements", announcementsRoute);
 
 // Connect to MongoDB
 mongoose
