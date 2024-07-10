@@ -7,14 +7,13 @@ const router = express.Router();
 router.use(express.json());
 router.use(express.urlencoded({ extended: true }));
 
-// Route for saving a new announcement
+// Route for creating a new announcement
 router.post("/", async (req, res) => {
   try {
-    // Log the incoming request body
     console.log("Received POST request body:", req.body);
 
-    // Destructure required fields from request body
-    const { title, image, content, pdfName, pdfPath } = req.body;
+    // Destructure the fields from the request body
+    const { title, image, content, link } = req.body;
 
     // Validate the required fields
     if (!title || !image) {
@@ -24,7 +23,7 @@ router.post("/", async (req, res) => {
     }
 
     // Create a new announcement object
-    const newAnnouncement = { title, image, content, pdfName, pdfPath };
+    const newAnnouncement = { title, image, content, link };
 
     // Save the announcement to the database
     const announcement = await Announcement.create(newAnnouncement);
@@ -37,7 +36,7 @@ router.post("/", async (req, res) => {
   }
 });
 
-// Route for getting all announcements from the database
+// Route for fetching all announcements
 router.get("/", async (req, res) => {
   try {
     // Fetch all announcements from the database
@@ -53,7 +52,7 @@ router.get("/", async (req, res) => {
   }
 });
 
-// Route for getting a single announcement by ID
+// Route for fetching a single announcement by ID
 router.get("/:id", async (req, res) => {
   try {
     // Extract the ID from the request parameters
@@ -80,12 +79,10 @@ router.put("/:id", async (req, res) => {
   try {
     // Extract the ID from the request parameters
     const { id } = req.params;
-
-    // Log the incoming request body for debugging
     console.log("Received PUT request body:", req.body);
 
     // Destructure the fields from the request body
-    const { title, image, content, pdfName, pdfPath } = req.body;
+    const { title, image, content, link } = req.body;
 
     // Validate the required fields
     if (!title || !image) {
@@ -93,7 +90,7 @@ router.put("/:id", async (req, res) => {
     }
 
     // Prepare the update object
-    const updateData = { title, image, content, pdfName, pdfPath };
+    const updateData = { title, image, content, link };
 
     // Perform the update operation
     const result = await Announcement.findByIdAndUpdate(
